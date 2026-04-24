@@ -1,0 +1,153 @@
+# Kustomize 基础配置
+# =============================
+# 这是所有环境共享的基础配置。
+# 环境特定的自定义通过 overlays 应用。
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# TODO: 添加通用标签
+# 此 kustomization 创建的所有资源都将具有这些标签
+commonLabels:
+  app.kubernetes.io/name: ml-api
+  app.kubernetes.io/component: api
+  app.kubernetes.io/part-of: ml-system
+
+# TODO: 定义命名空间
+# 所有资源将在此命名空间中创建
+namespace: ml-system
+
+# TODO: 列出基础资源
+# 添加所有基础资源清单的路径
+resources:
+  # TODO: 添加资源文件
+  # - namespace.yaml
+  # - deployment.yaml
+  # - service.yaml
+  # - configmap.yaml
+  # - secret.yaml  # 使用 SealedSecret 或外部密钥管理
+  # - hpa.yaml
+  # - pdb.yaml  # Pod 中断预算
+  # - networkpolicy.yaml
+  # - serviceaccount.yaml
+  # - role.yaml
+  # - rolebinding.yaml
+
+# TODO: 配置 ConfigMap 生成器
+# 从文件或字面量生成 ConfigMaps
+configMapGenerator:
+  # 示例：
+  # - name: ml-model-config
+  #   literals:
+  #     - MODEL_NAME=image-classifier
+  #     - MODEL_VERSION=latest
+  #     - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+  #     - LOG_LEVEL=INFO
+
+# TODO: 配置 Secret 生成器
+# 生成 Secrets（仅用于开发 - 生产环境使用 Sealed Secrets）
+secretGenerator:
+  # 示例：
+  # - name: api-keys
+  #   literals:
+  #     - API_KEY=dev-api-key-change-in-production
+
+# TODO: 添加通用注解
+# 这些注解将被添加到所有资源
+commonAnnotations:
+  # 示例：
+  # managed-by: kustomize
+  # version: "1.0"
+
+# TODO: 定义镜像
+# 指定要使用的容器镜像
+images:
+  # 示例：
+  # - name: ml-api
+  #   newName: ghcr.io/your-org/ml-api
+  #   newTag: latest
+
+# TODO: 添加转换器
+# 对资源应用补丁或转换
+# patches:
+#   - path: patches/replica-count.yaml
+#   - path: patches/resource-limits.yaml
+
+# ==============================================================================
+# 学生实施指南
+# ==============================================================================
+
+# 此 kustomization.yaml 定义了跨所有环境（dev、staging、production）
+# 共享的基础配置。
+#
+# 实施步骤：
+#
+# 1. 创建基础资源清单：
+#    在 kubernetes/base/ 中创建以下 YAML 文件：
+#
+#    a) namespace.yaml:
+#       - 定义 ml-system 命名空间
+#       - 如需要，添加资源配额
+#
+#    b) deployment.yaml:
+#       - 定义 ml-api 的 Deployment
+#       - 指定容器镜像、端口、环境变量
+#       - 配置存活探针和就绪探针
+#       - 设置资源请求和限制
+#       - 使用 ConfigMap 和 Secret 引用
+#
+#    c) service.yaml:
+#       - 定义 ClusterIP Service
+#       - 暴露端口 80 → targetPort 5000
+#       - 添加适当的选择器
+#
+#    d) configmap.yaml:
+#       - 存储非敏感配置
+#       - 模型名称、版本、MLflow URI 等
+#
+#    e) secret.yaml:
+#       - 使用 SealedSecret 或外部密钥管理器
+#       - 绝对不要将明文 Secrets 提交到 Git
+#
+#    f) hpa.yaml:
+#       - 配置水平 Pod 自动扩缩容器
+#       - 最小：3，最大：20 个副本
+#       - 目标：CPU 70%，内存 80%
+#
+#    g) pdb.yaml:
+#       - 配置 Pod 中断预算
+#       - 确保中断期间至少有 2 个 pod 可用
+#
+#    h) networkpolicy.yaml:
+#       - 定义网络策略
+#       - 默认拒绝所有，明确允许规则
+#
+#    i) serviceaccount.yaml:
+#       - 为 ml-api 创建 ServiceAccount
+#       - 避免使用默认 ServiceAccount
+#
+#    j) role.yaml + rolebinding.yaml:
+#       - 定义 RBAC 权限
+#       - 授予最小所需权限
+#
+# 2. 配置 Kustomization：
+#    - 取消注释并填充上面所有 TODO 部分
+#    - 将所有资源文件添加到 resources: 列表
+#    - 配置 ConfigMapGenerator 和 SecretGenerator
+#    - 设置适当的标签和注解
+#
+# 3. 测试基础配置：
+#    kubectl kustomize kubernetes/base/
+#    这应输出所有生成的 YAML
+#
+# 4. 应用基础配置（用于测试）：
+#    kubectl apply -k kubernetes/base/
+#    验证所有资源都已创建
+#
+# 5. 创建环境 Overlays：
+#    每个环境（dev、staging、production）都将有一个 overlay
+#    用于自定义基础配置
+#
+# 参考资源：
+# - Kustomize 文档：https://kustomize.io/
+# - Kubernetes 最佳实践：https://kubernetes.io/docs/concepts/configuration/overview/

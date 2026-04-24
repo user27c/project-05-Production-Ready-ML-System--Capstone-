@@ -1,0 +1,256 @@
+# HashiCorp Vault 配置（可选但推荐）
+# =========================================================
+# 本文件展示如何集成 HashiCorp Vault 进行密钥管理。
+# Vault 提供动态密钥、加密即服务和审计日志功能。
+
+# 注意：这是一个高级主题。对于简单的项目，使用带有 SealedSecrets 的
+# Kubernetes Secrets 就足够了。为需要企业级密钥管理的生产系统实施 Vault。
+
+---
+# TODO: 使用 Helm 安装 Vault
+# helm repo add hashicorp https://helm.releases.hashicorp.com
+# helm repo update
+# helm install vault hashicorp/vault \
+#   --namespace vault \
+#   --create-namespace \
+#   --values vault-values.yaml
+
+# vault-values.yaml 示例：
+# server:
+#   ha:
+#     enabled: true
+#     replicas: 3
+#   dataStorage:
+#     enabled: true
+#     size: 10Gi
+#   auditStorage:
+#     enabled: true
+#     size: 10Gi
+
+---
+# ml-api 与 Vault 进行身份验证的 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-api-vault-auth
+  namespace: ml-system-production
+
+---
+# CSI Driver 的 SecretProviderClass（推荐方法）
+# 使用 Secrets Store CSI Driver 挂载 Vault 密钥
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: vault-ml-api-secrets
+  namespace: ml-system-production
+spec:
+  provider: vault
+  parameters:
+    # TODO: 配置 Vault 地址
+    vaultAddress: "http://vault.vault:8200"
+
+    # TODO: 配置 Vault 角色
+    roleName: "ml-api-role"
+
+    # TODO: 定义要从 Vault 获取的密钥
+    objects: |
+      - objectName: "api-key"
+        secretPath: "secret/data/ml-api/production"
+        secretKey: "api_key"
+      - objectName: "mlflow-password"
+        secretPath: "secret/data/ml-api/production"
+        secretKey: "mlflow_password"
+      - objectName: "db-password"
+        secretPath: "secret/data/ml-api/production"
+        secretKey: "db_password"
+
+  # TODO: 同步密钥到 Kubernetes Secret（可选）
+  secretObjects:
+    - secretName: ml-api-secrets
+      type: Opaque
+      data:
+        - objectName: api-key
+          key: API_KEY
+        - objectName: mlflow-password
+          key: MLFLOW_PASSWORD
+        - objectName: db-password
+          key: DB_PASSWORD
+
+---
+# 使用 Vault CSI Driver 挂载 Vault 密钥的 Deployment 示例
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-api-deployment-vault-example
+  namespace: ml-system-production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ml-api
+  template:
+    metadata:
+      labels:
+        app: ml-api
+    spec:
+      serviceAccountName: ml-api-vault-auth
+
+      # TODO: 添加密钥存储卷
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: vault-ml-api-secrets
+
+      containers:
+        - name: ml-api
+          image: ghcr.io/your-org/ml-api:v1.0.0
+
+          # TODO: 挂载密钥存储卷
+          volumeMounts:
+            - name: secrets-store
+              mountPath: "/mnt/secrets"
+              readOnly: true
+
+          # TODO: 通过环境变量引用密钥
+          env:
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-api-secrets
+                  key: API_KEY
+            - name: MLFLOW_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ml-api-secrets
+                  key: MLFLOW_PASSWORD
+
+# ==============================================================================
+# VAULT 服务器中的 VAULT 配置
+# ==============================================================================
+
+# TODO: 初始化和解封 Vault
+# 部署 Vault 后，需要对其进行初始化和解封。
+# 这通常在初始设置期间完成一次。
+
+# 1. 初始化 Vault：
+#    kubectl exec -n vault vault-0 -- vault operator init
+#    # 请安全保存解封密钥和根令牌！
+
+# 2. 解封 Vault（对每个副本重复）：
+#    kubectl exec -n vault vault-0 -- vault operator unseal <unseal-key-1>
+#    kubectl exec -n vault vault-0 -- vault operator unseal <unseal-key-2>
+#    kubectl exec -n vault vault-0 -- vault operator unseal <unseal-key-3>
+
+# TODO: 启用 Kubernetes 身份验证
+# vault auth enable kubernetes
+#
+# vault write auth/kubernetes/config \
+#   kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
+#   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+#   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+# TODO: 为 ml-api 创建 Vault 策略
+# cat <<EOF | vault policy write ml-api-policy -
+# path "secret/data/ml-api/*" {
+#   capabilities = ["read"]
+# }
+# EOF
+
+# TODO: 创建 Kubernetes 身份验证的 Vault 角色
+# vault write auth/kubernetes/role/ml-api-role \
+#   bound_service_account_names=ml-api-vault-auth \
+#   bound_service_account_namespaces=ml-system-production \
+#   policies=ml-api-policy \
+#   ttl=24h
+
+# TODO: 在 Vault 中存储密钥
+# vault kv put secret/ml-api/production \
+#   api_key="your-production-api-key" \
+#   mlflow_password="your-mlflow-password" \
+#   db_password="your-db-password"
+
+# TODO: 验证密钥
+# vault kv get secret/ml-api/production
+
+# ==============================================================================
+# 替代方案：Vault Agent Sidecar 注入
+# ==============================================================================
+
+# 除了 CSI Driver，您还可以使用 Vault Agent sidecar
+# 这会自动注入一个 Vault Agent 容器
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-api-deployment-vault-agent-example
+  namespace: ml-system-production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ml-api
+  template:
+    metadata:
+      labels:
+        app: ml-api
+      annotations:
+        # TODO: 启用 Vault Agent 注入
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "ml-api-role"
+
+        # TODO: 注入特定密钥
+        vault.hashicorp.com/agent-inject-secret-api-key: "secret/data/ml-api/production"
+        vault.hashicorp.com/agent-inject-template-api-key: |
+          {{- with secret "secret/data/ml-api/production" -}}
+          export API_KEY="{{ .Data.data.api_key }}"
+          {{- end }}
+
+    spec:
+      serviceAccountName: ml-api-vault-auth
+      containers:
+        - name: ml-api
+          image: ghcr.io/your-org/ml-api:v1.0.0
+          # 密钥将位于 /vault/secrets/
+
+# ==============================================================================
+# 学生实施说明
+# ==============================================================================
+
+# Vault 是一个高级主题。在以下情况下实施：
+# - 您需要企业级密钥管理
+# - 您有合规要求（SOC 2、HIPAA）
+# - 您需要动态密钥或加密即服务
+# - 您管理跨多个服务的许多密钥
+#
+# 对于更简单的项目，请使用：
+# - Kubernetes Secrets（基线）
+# - SealedSecrets（可安全提交加密密钥）
+# - 云提供商密钥管理器（AWS Secrets Manager、GCP Secret Manager）
+#
+# TODO: 实施步骤：
+#
+# 1. 通过 Helm 安装 Vault
+# 2. 初始化和解封 Vault
+# 3. 启用 Kubernetes 身份验证
+# 4. 创建策略和角色
+# 5. 在 Vault 中存储密钥
+# 6. 安装 Secrets Store CSI Driver：
+#    helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+#    helm install csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver \
+#      --namespace kube-system
+# 7. 安装 Vault CSI Provider：
+#    helm repo add hashicorp https://helm.releases.hashicorp.com
+#    helm install vault-csi-provider hashicorp/vault-csi-provider \
+#      --namespace vault
+# 8. 创建 SecretProviderClass
+# 9. 更新 Deployment 以使用 Vault 密钥
+# 10. 测试密钥检索
+#
+# 参考资源：
+# - Vault 文档：https://www.vaultproject.io/docs
+# - Kubernetes 上的 Vault：https://www.vaultproject.io/docs/platform/k8s
+# - CSI Driver：https://secrets-store-csi-driver.sigs.k8s.io/

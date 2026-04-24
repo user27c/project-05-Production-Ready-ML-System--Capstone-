@@ -1,0 +1,210 @@
+# Kustomize Overlay - Staging 环境
+# ========================================
+# 此 overlay 自定义基础配置以适应 staging 环境。
+# Staging 镜像生产环境但使用独立的基础设施进行测试。
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# TODO: 引用基础配置
+bases:
+  - ../../base
+
+# TODO: 添加环境特定标签
+commonLabels:
+  environment: staging
+
+# TODO: 覆盖命名空间
+namespace: ml-system-staging
+
+# TODO: 为 staging 打补丁
+patchesStrategicMerge:
+  # TODO: 添加 staging 特定的补丁
+  # - replica-count-patch.yaml
+  # - ingress-patch.yaml
+  # - tls-patch.yaml
+
+# TODO: 设置 staging 的副本数
+replicas:
+  # - name: ml-api-deployment
+  #   count: 3  # 最低高可用配置
+
+# TODO: 使用 staging 标签覆盖镜像
+images:
+  # - name: ml-api
+  #   newName: ghcr.io/your-org/ml-api
+  #   newTag: staging-${GIT_SHA}
+
+# TODO: 覆盖 staging 的 ConfigMap 值
+configMapGenerator:
+  - name: ml-model-config
+    behavior: merge
+    literals:
+      # TODO: 添加 staging 特定配置
+      # - MODEL_NAME=image-classifier
+      # - MODEL_VERSION=staging
+      # - MLFLOW_TRACKING_URI=https://mlflow-staging.example.com
+      # - LOG_LEVEL=INFO
+      # - ENVIRONMENT=staging
+      # - METRICS_ENABLED=true
+      # - TRACING_ENABLED=true
+
+# TODO: 为 staging 使用 sealed secrets 或外部 secrets
+# 不要在类似生产环境的地方使用 secretGenerator
+# secretGenerator:
+#   - name: api-keys
+#     # 请改用 SealedSecret 或 HashiCorp Vault
+
+# TODO: 添加 staging 特定资源
+resources:
+  # TODO: 为 staging 添加额外资源
+  # - ingress.yaml
+  # - certificate.yaml (cert-manager)
+  # - sealed-secret.yaml
+
+# ==============================================================================
+# STAGING 环境特性
+# ==============================================================================
+
+# Staging 应尽可能镜像生产环境，以便在部署到生产前发现问题：
+#
+# 1. 高可用性：
+#    - 最少 3 个副本
+#    - 启用 HPA（3-10 个副本）
+#    - Pod 中断预算
+#    - 多节点部署
+#
+# 2. 类似生产的配置：
+#    - 与生产环境相同的资源限制（或略低）
+#    - 相同的环境变量（端点除外）
+#    - 相同的安全策略
+#
+# 3. 启用 TLS：
+#    - 使用有效证书的 HTTPS（Let's Encrypt staging）
+#    - cert-manager 自动管理证书
+#    - 域名：staging.example.com 或类似
+#
+# 4. 监控：
+#    - 完整的 Prometheus/Grafana 栈
+#    - Alertmanager（测试告警，不分页）
+#    - ELK 栈用于日志
+#    - 启用所有指标
+#
+# 5. Staging 特定服务：
+#    - 独立的 MLflow 实例
+#    - 独立的数据库（PostgreSQL）
+#    - 独立的 S3/MinIO 存储桶
+#    - 匿名化的生产数据或合成数据
+#
+# 6. 自动化部署：
+#    - 合并到 develop 分支时自动部署
+#    - 部署后运行集成测试
+#    - 部署状态告警团队
+#
+# 7. 测试环境：
+#    - 在生产前测试新功能
+#    - 负载测试
+#    - 混沌工程（可选）
+#    - 安全扫描
+#
+# ==============================================================================
+# 学生实施
+# ==============================================================================
+
+# TODO: 创建以下补丁文件：
+#
+# 1. replica-count-patch.yaml:
+#    apiVersion: apps/v1
+#    kind: Deployment
+#    metadata:
+#      name: ml-api-deployment
+#    spec:
+#      replicas: 3
+#
+# 2. ingress-patch.yaml:
+#    apiVersion: networking.k8s.io/v1
+#    kind: Ingress
+#    metadata:
+#      name: ml-api-ingress
+#      annotations:
+#        cert-manager.io/cluster-issuer: letsencrypt-staging
+#    spec:
+#      ingressClassName: nginx
+#      rules:
+#        - host: staging.example.com
+#          http:
+#            paths:
+#              - path: /
+#                pathType: Prefix
+#                backend:
+#                  service:
+#                    name: ml-api
+#                    port:
+#                      number: 80
+#      tls:
+#        - hosts:
+#            - staging.example.com
+#          secretName: staging-tls
+#
+# 3. 创建额外的资源文件：
+#
+#    a) certificate.yaml:
+#       - cert-manager Certificate 资源
+#       - 为 staging.example.com 请求证书
+#
+#    b) sealed-secret.yaml:
+#       - 使用 kubeseal 加密密钥
+#       - 可安全地将加密密钥提交到 Git
+#
+# TODO: 设置外部依赖：
+#
+# 1. 域名配置：
+#    - 为 staging.example.com 创建 DNS A 记录
+#    - 指向 LoadBalancer IP
+#
+# 2. 安装 cert-manager：
+#    helm install cert-manager jetstack/cert-manager \
+#      --namespace cert-manager \
+#      --create-namespace \
+#      --set installCRDs=true
+#
+# 3. 安装 NGINX Ingress Controller：
+#    helm install ingress-nginx ingress-nginx/ingress-nginx \
+#      --namespace ingress-nginx \
+#      --create-namespace
+#
+# 4. 安装 Sealed Secrets Controller：
+#    kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
+#
+# TODO: 测试 staging 部署：
+#
+# 1. 预览生成的清单：
+#    kubectl kustomize kubernetes/overlays/staging/
+#
+# 2. 应用到集群：
+#    kubectl apply -k kubernetes/overlays/staging/
+#
+# 3. 验证部署：
+#    kubectl get all -n ml-system-staging
+#    kubectl get ingress -n ml-system-staging
+#    kubectl get certificate -n ml-system-staging
+#
+# 4. 等待证书：
+#    kubectl wait --for=condition=Ready certificate/staging-tls -n ml-system-staging --timeout=5m
+#
+# 5. 测试端点：
+#    curl https://staging.example.com/health
+#    curl -H "X-API-Key: your-staging-key" https://staging.example.com/info
+#
+# 6. 检查日志：
+#    kubectl logs -n ml-system-staging -l app=ml-api --tail=100 -f
+#
+# 7. 监控指标：
+#    kubectl port-forward -n ml-system-staging svc/prometheus 9090:9090
+#    # 打开 http://localhost:9090
+#
+# TODO: 与 CI/CD 集成：
+#
+# 当代码合并到 develop 分支时，CD 流水线会自动部署此 staging overlay。
+#
+# 参见：cicd/.github/workflows/cd.yml (deploy-staging job)

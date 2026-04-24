@@ -1,0 +1,508 @@
+name: CD 流水线
+
+# TODO: 配置触发条件
+# Staging：推送到 develop 分支时自动触发
+# 生产环境：手动工作流分发，需要批准
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '目标环境'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: '要部署的 Docker 镜像标签'
+        required: true
+        default: 'latest'
+
+env:
+  KUBECTL_VERSION: 'v1.28.0'
+  HELM_VERSION: 'v3.12.0'
+
+jobs:
+  # ==========================================================================
+  # 任务 1：部署到 STAGING（自动）
+  # ==========================================================================
+  deploy-staging:
+    name: 部署到 Staging
+    runs-on: ubuntu-latest
+    # 仅在以下情况下运行：
+    # - 推送到 develop 分支，或
+    # - 手动触发 with staging 环境
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+
+    environment:
+      name: staging
+      url: https://staging.example.com
+
+    steps:
+      # TODO: 检出代码
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      # TODO: 设置 kubectl
+      # 安装 kubectl CLI
+      - name: 设置 kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      # TODO: 设置 Helm
+      # 安装 Helm CLI
+      - name: 设置 Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      # TODO: 使用 staging 集群配置 kubectl
+      # 从 secret 创建 kubeconfig
+      # Secret 包含 base64 编码的 kubeconfig
+      - name: 配置 kubectl
+        run: |
+          # TODO: 实现 kubeconfig 设置
+          # mkdir -p $HOME/.kube
+          # echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          # chmod 600 $HOME/.kube/config
+          echo "TODO: 配置 kubeconfig"
+
+      # TODO: 验证集群连接
+      - name: 验证集群访问
+        run: |
+          # TODO: 测试集群连接
+          # kubectl cluster-info
+          # kubectl get nodes
+          echo "TODO: 验证集群"
+
+      # TODO: 确定镜像标签
+      # 如果提供了手动输入则使用，否则使用 git SHA
+      - name: 设置镜像标签
+        id: image
+        run: |
+          # TODO: 确定镜像标签
+          # if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          #   IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+          # else
+          #   IMAGE_TAG="${{ github.sha }}"
+          # fi
+          # echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          # echo "正在部署镜像标签: $IMAGE_TAG"
+          echo "TODO: 设置镜像标签"
+
+      # TODO: 使用 Helm 部署
+      # helm upgrade --install 使用 staging values
+      # 等待滚动更新完成
+      - name: 使用 Helm 部署
+        run: |
+          # TODO: 实现 Helm 部署
+          # helm upgrade --install ml-system ./helm/ml-system \
+          #   --namespace staging \
+          #   --create-namespace \
+          #   --values ./helm/ml-system/values-staging.yaml \
+          #   --set api.image.tag=${{ steps.image.outputs.tag }} \
+          #   --wait \
+          #   --timeout 10m \
+          #   --atomic  # 失败时回滚
+          echo "TODO: 使用 Helm 部署"
+
+      # TODO: 等待部署滚动更新
+      # 验证所有 pod 正在运行
+      - name: 等待滚动更新
+        run: |
+          # TODO: 实现滚动更新状态检查
+          # kubectl rollout status deployment/ml-system-api -n staging --timeout=5m
+          echo "TODO: 检查滚动更新状态"
+
+      # TODO: 获取服务端点
+      # 获取 LoadBalancer IP 或 Ingress URL
+      - name: 获取服务端点
+        id: endpoint
+        run: |
+          # TODO: 获取外部 IP/URL
+          # ENDPOINT=$(kubectl get ingress ml-system-ingress -n staging -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          # echo "url=https://$ENDPOINT" >> $GITHUB_OUTPUT
+          # echo "Staging 端点: https://$ENDPOINT"
+          echo "TODO: 获取端点"
+
+      # TODO: 运行冒烟测试
+      # 基本健康检查以验证部署
+      - name: 运行冒烟测试
+        env:
+          API_URL: ${{ steps.endpoint.outputs.url }}
+          API_KEY: ${{ secrets.STAGING_API_KEY }}
+        run: |
+          # TODO: 实现冒烟测试
+          # # 等待服务就绪
+          # sleep 30
+          #
+          # # 健康检查
+          # curl -f $API_URL/health || exit 1
+          #
+          # # 信息端点
+          # curl -f -H "X-API-Key: $API_KEY" $API_URL/info || exit 1
+          #
+          # # 指标端点
+          # curl -f $API_URL/metrics || exit 1
+          echo "TODO: 运行冒烟测试"
+
+      # TODO: 运行集成测试
+      # 完整 API 测试套件
+      - name: 运行集成测试
+        env:
+          API_URL: ${{ steps.endpoint.outputs.url }}
+          API_KEY: ${{ secrets.STAGING_API_KEY }}
+        run: |
+          # TODO: 运行集成测试套件
+          # pip install pytest requests
+          # pytest tests/integration/ -v --api-url=$API_URL --api-key=$API_KEY
+          echo "TODO: 运行集成测试"
+
+      # TODO: 运行负载测试（可选）
+      # 使用 k6 进行基本负载测试
+      - name: 运行负载测试
+        run: |
+          # TODO: 实现负载测试
+          # # 安装 k6
+          # curl https://github.com/grafana/k6/releases/download/v0.46.0/k6-v0.46.0-linux-amd64.tar.gz -L | tar xvz
+          # sudo mv k6-v0.46.0-linux-amd64/k6 /usr/local/bin/
+          #
+          # # 运行负载测试
+          # k6 run tests/load/basic-load-test.js
+          echo "TODO: 运行负载测试"
+
+      # TODO: 成功时通知团队
+      - name: 通知部署成功
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            ✅ Staging 部署成功
+            环境：Staging
+            镜像：${{ steps.image.outputs.tag }}
+            URL：${{ steps.endpoint.outputs.url }}
+            部署者：${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: success()
+
+      # TODO: 失败时通知团队
+      - name: 通知部署失败
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            ❌ Staging 部署失败
+            镜像：${{ steps.image.outputs.tag }}
+            错误：查看 GitHub Actions 日志
+            部署者：${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: failure()
+
+
+  # ==========================================================================
+  # 任务 2：部署到生产环境（需要手动批准）
+  # ==========================================================================
+  deploy-production:
+    name: 部署到生产环境
+    runs-on: ubuntu-latest
+    # 仅在手动工作流分发且为 production 环境时运行
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+
+    # 部署到生产环境前需要手动批准
+    environment:
+      name: production
+      url: https://api.example.com
+
+    steps:
+      # TODO: 检出代码
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      # TODO: 设置 kubectl 和 Helm
+      - name: 设置 kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: 设置 Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      # TODO: 使用生产集群配置 kubectl
+      - name: 配置 kubectl
+        run: |
+          # TODO: 设置生产 kubeconfig
+          # mkdir -p $HOME/.kube
+          # echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          # chmod 600 $HOME/.kube/config
+          echo "TODO: 配置生产 kubeconfig"
+
+      # TODO: 验证集群连接
+      - name: 验证集群访问
+        run: |
+          # TODO: 验证生产集群
+          # kubectl cluster-info
+          # kubectl get nodes
+          echo "TODO: 验证生产集群"
+
+      # TODO: 备份当前生产部署
+      # 保存当前部署 YAML 以便需要时回滚
+      - name: 备份当前部署
+        run: |
+          # TODO: 备份部署
+          # kubectl get deployment ml-system-api -n production -o yaml > backup-deployment.yaml
+          # kubectl get configmap ml-model-config -n production -o yaml > backup-configmap.yaml
+          echo "TODO: 备份部署"
+
+      - name: 上传备份
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-backup
+          path: backup-*.yaml
+
+      # TODO: 部署金丝雀（10% 流量）
+      # 部署新版本到金丝雀 pod
+      # 路由 10% 流量到金丝雀
+      - name: 部署金丝雀
+        run: |
+          # TODO: 实现金丝雀部署
+          # # 选项 1：使用 Istio/Flagger（高级）
+          # # 选项 2：使用独立部署 + 服务权重
+          # # 选项 3：使用 Argo Rollouts
+          #
+          # # 基本 Kubernetes 示例：
+          # helm upgrade ml-system ./helm/ml-system \
+          #   --namespace production \
+          #   --values ./helm/ml-system/values-production.yaml \
+          #   --set api.image.tag=${{ github.event.inputs.image_tag }} \
+          #   --set api.canary.enabled=true \
+          #   --set api.canary.replicas=1 \
+          #   --set api.canary.weight=10 \
+          #   --wait
+          echo "TODO: 部署金丝雀"
+
+      # TODO: 监控金丝雀指标
+      # 观察错误率、延迟和其他指标 10 分钟
+      # 如果指标下降，中止并回滚
+      - name: 监控金丝雀
+        run: |
+          # TODO: 实现金丝雀监控
+          # # 查询 Prometheus 获取金丝雀指标
+          # # 比较金丝雀 vs 稳定版本的错误率、延迟
+          # # 如果金丝雀 error_rate > 稳定版本 error_rate * 1.5，中止
+          #
+          # python scripts/monitor_canary.py \
+          #   --duration 600 \
+          #   --error-threshold 0.05 \
+          #   --latency-threshold 1.0
+          echo "TODO: 监控金丝雀"
+
+      # TODO: 将金丝雀升级到完全部署
+      # 如果金丝雀健康，滚动更新到所有 pod
+      - name: 升级金丝雀
+        if: success()
+        run: |
+          # TODO: 实现完全滚动更新
+          # helm upgrade ml-system ./helm/ml-system \
+          #   --namespace production \
+          #   --values ./helm/ml-system/values-production.yaml \
+          #   --set api.image.tag=${{ github.event.inputs.image_tag }} \
+          #   --set api.canary.enabled=false \
+          #   --wait \
+          #   --timeout 15m
+          echo "TODO: 升级金丝雀"
+
+      # TODO: 验证完全部署
+      - name: 验证部署
+        run: |
+          # TODO: 检查滚动更新状态
+          # kubectl rollout status deployment/ml-system-api -n production
+          echo "TODO: 验证部署"
+
+      # TODO: 失败时回滚
+      # 如果部署失败从备份恢复
+      - name: 失败时回滚
+        if: failure()
+        run: |
+          # TODO: 实现回滚
+          # # 选项 1：Helm 回滚
+          # helm rollback ml-system -n production
+          #
+          # # 选项 2：kubectl apply 备份
+          # kubectl apply -f backup-deployment.yaml
+          # kubectl apply -f backup-configmap.yaml
+          echo "TODO: 回滚部署"
+
+      # TODO: 运行生产冒烟测试
+      - name: 生产冒烟测试
+        env:
+          API_URL: https://api.example.com
+          API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+        run: |
+          # TODO: 运行冒烟测试
+          # curl -f $API_URL/health || exit 1
+          # curl -f -H "X-API-Key: $API_KEY" $API_URL/info || exit 1
+          echo "TODO: 运行生产冒烟测试"
+
+      # TODO: 在 Git 中标记部署
+      # 为此生产部署创建 Git 标签
+      - name: 标记部署
+        if: success()
+        run: |
+          # TODO: 创建并推送 Git 标签
+          # git config user.name "GitHub Actions"
+          # git config user.email "actions@github.com"
+          # git tag -a "prod-${{ github.event.inputs.image_tag }}" -m "生产部署"
+          # git push origin "prod-${{ github.event.inputs.image_tag }}"
+          echo "TODO: 标记部署"
+
+      # TODO: 在 MLflow 中更新模型版本
+      # 在 MLflow 注册表中将部署的模型标记为 "Production"
+      - name: 更新 MLflow
+        if: success()
+        run: |
+          # TODO: 在 MLflow 中标记模型
+          # python scripts/tag_model_production.py \
+          #   --model-name image-classifier \
+          #   --version ${{ github.event.inputs.image_tag }}
+          echo "TODO: 更新 MLflow 注册表"
+
+      # TODO: 通知团队部署成功
+      - name: 通知部署成功
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            🚀 生产部署成功
+            环境：Production
+            镜像：${{ github.event.inputs.image_tag }}
+            URL：https://api.example.com
+            部署者：${{ github.actor }}
+
+            使用金丝雀策略完成部署。
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: success()
+
+      # TODO: 部署失败时告警团队
+      - name: 告警部署失败
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            🚨 生产部署失败
+            镜像：${{ github.event.inputs.image_tag }}
+            尝试者：${{ github.actor }}
+
+            部署已回滚。
+            查看 GitHub Actions 日志了解详情。
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: failure()
+
+      # TODO: 部署失败时创建事件
+      # 可选：创建 PagerDuty 事件
+      - name: 创建事件
+        if: failure()
+        run: |
+          # TODO: 创建 PagerDuty 事件
+          # curl -X POST https://api.pagerduty.com/incidents \
+          #   -H "Authorization: Token token=${{ secrets.PAGERDUTY_TOKEN }}" \
+          #   -H "Content-Type: application/json" \
+          #   -d '{
+          #     "incident": {
+          #       "type": "incident",
+          #       "title": "生产部署失败",
+          #       "service": {...},
+          #       "urgency": "high"
+          #     }
+          #   }'
+          echo "TODO: 创建事件"
+
+
+# ==============================================================================
+# 学生实施说明
+# ==============================================================================
+
+# 学生 TODO 列表：
+#
+# 1. Kubernetes 集群设置：
+#    [ ] 设置 staging Kubernetes 集群（GKE/EKS/AKS）
+#    [ ] 设置生产 Kubernetes 集群（与 staging 分离）
+#    [ ] 配置集群访问（kubeconfig）
+#    [ ] 设置 Ingress controller（NGINX）
+#    [ ] 设置 cert-manager 用于 TLS
+#
+# 2. GitHub Secrets：
+#    [ ] 添加 KUBE_CONFIG_STAGING（base64 编码的 kubeconfig）
+#    [ ] 添加 KUBE_CONFIG_PRODUCTION（base64 编码的 kubeconfig）
+#    [ ] 添加 STAGING_API_KEY（用于测试）
+#    [ ] 添加 PRODUCTION_API_KEY（用于测试）
+#    [ ] 添加 SLACK_WEBHOOK（用于通知）
+#    [ ] 添加 PAGERDUTY_TOKEN（可选，用于事件）
+#
+# 3. Helm Charts：
+#    [ ] 在 ./helm/ml-system/ 创建 Helm chart
+#    [ ] 创建 values-staging.yaml
+#    [ ] 创建 values-production.yaml
+#    [ ] 本地测试 Helm chart
+#
+# 4. 部署脚本：
+#    [ ] 创建 scripts/monitor_canary.py
+#    [ ] 创建 scripts/tag_model_production.py
+#    [ ] 创建 tests/integration/ 测试套件
+#    [ ] 创建 tests/load/ k6 脚本
+#
+# 5. CD 流水线实现：
+#    [ ] 取消注释并实现所有 TODO 部分
+#    [ ] 手动测试 staging 部署
+#    [ ] 手动测试生产部署
+#    [ ] 测试回滚程序
+#
+# 6. 环境配置：
+#    [ ] 设置 GitHub Environments（staging、production）
+#    [ ] 为生产环境配置必需审核者
+#    [ ] 设置环境保护规则
+#    [ ] 配置环境 secrets
+#
+# 7. 监控集成：
+#    [ ] 在两个环境中设置 Prometheus
+#    [ ] 创建金丝雀监控查询
+#    [ ] 设置部署失败告警
+#    [ ] 测试告警路由
+#
+# 8. 金丝雀部署：
+#    [ ] 实现金丝雀部署策略
+#    [ ] 定义流量分割机制
+#    [ ] 设置金丝雀指标监控
+#    [ ] 测试金丝雀回滚
+#
+# 9. 回滚测试：
+#    [ ] 测试 Helm 回滚
+#    [ ] 测试备份/恢复程序
+#    [ ] 记录回滚 SOP
+#    [ ] 在 staging 中练习回滚
+#
+# 10. 文档：
+#     [ ] 记录 CD 流水线工作流程
+#     [ ] 创建部署运行手册
+#     [ ] 记录回滚程序
+#     [ ] 创建事件响应指南
+#
+# 高级主题（可选）：
+#   - 使用 ArgoCD 或 Flux 的 GitOps
+#   - 使用 Flagger 的渐进式交付
+#   - 服务网格（Istio/Linkerd）用于流量分割
+#   - 蓝绿部署策略
+#   - SLO 违规时自动回滚
+#
+# 预期部署时间：
+#   - Staging：8-10 分钟（自动）
+#   - 生产（金丝雀）：20-25 分钟（带监控）
+#   - 生产（完全滚动更新）：10-15 分钟
+#   - 回滚：2-5 分钟

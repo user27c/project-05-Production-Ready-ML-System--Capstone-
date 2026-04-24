@@ -1,0 +1,353 @@
+# Kustomize Overlay - 生产环境
+# ===========================================
+# 此 overlay 自定义基础配置以适应生产部署。
+# 生产环境需要最高的可靠性、安全性和性能标准。
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# TODO: 引用基础配置
+bases:
+  - ../../base
+
+# TODO: 添加生产环境特定标签
+commonLabels:
+  environment: production
+  criticality: high
+
+# TODO: 覆盖命名空间
+namespace: ml-system-production
+
+# TODO: 生产环境特定补丁
+patchesStrategicMerge:
+  # TODO: 添加生产环境补丁
+  # - replica-count-patch.yaml
+  # - resource-limits-patch.yaml
+  # - ingress-patch.yaml
+  # - monitoring-patch.yaml
+  # - security-patch.yaml
+
+# TODO: 设置生产环境副本数
+replicas:
+  # - name: ml-api-deployment
+  #   count: 5  # 生产环境更高的基准
+
+# TODO: 使用特定标签的生产环境镜像
+# 生产环境中绝对不要使用 'latest' 标签！
+images:
+  # - name: ml-api
+  #   newName: ghcr.io/your-org/ml-api
+  #   newTag: v1.2.3  # 特定版本标签，绝对不要用 'latest'
+
+# TODO: 生产环境 ConfigMap
+configMapGenerator:
+  - name: ml-model-config
+    behavior: merge
+    literals:
+      # TODO: 添加生产环境配置
+      # - MODEL_NAME=image-classifier
+      # - MODEL_VERSION=production  # 或特定版本号
+      # - MLFLOW_TRACKING_URI=https://mlflow.example.com
+      # - LOG_LEVEL=WARN  # 生产环境减少日志输出
+      # - ENVIRONMENT=production
+      # - METRICS_ENABLED=true
+      # - TRACING_ENABLED=true
+      # - PERFORMANCE_MONITORING=true
+      # - ENABLE_CACHE=true
+      # - CACHE_TTL_SECONDS=3600
+
+# TODO: 生产环境使用外部密钥管理
+# 生产环境中不要使用 secretGenerator
+# 使用 SealedSecrets、HashiCorp Vault、AWS Secrets Manager 等
+# secretGenerator: []  # 空
+
+# TODO: 添加生产环境特定资源
+resources:
+  # TODO: 添加生产环境资源
+  # - ingress.yaml
+  # - certificate.yaml
+  # - sealed-secret.yaml
+  # - pod-disruption-budget.yaml
+  # - service-monitor.yaml  # 用于 Prometheus
+  # - network-policy.yaml
+
+# ==============================================================================
+# 生产环境要求
+# ==============================================================================
+
+# 生产环境必须满足这些标准：
+#
+# 1. 高可用性：
+#    ✅ 最少 5 个副本（高流量时更多）
+#    ✅ HPA：最小 5，最大 20 个副本
+#    ✅ Pod 中断预算：minAvailable = 3
+#    ✅ 多可用区部署（跨 AZ 分布）
+#    ✅ Pod 反亲和性（副本不共存）
+#    ✅ 健康检查：存活探针、就绪探针、启动探针
+#    ✅ 滚动更新策略：maxSurge=1，maxUnavailable=0
+#
+# 2. 安全性：
+#    ✅ 使用有效生产证书的 TLS/HTTPS
+#    ✅ 使用 Let's Encrypt 生产的 cert-manager
+#    ✅ 强制执行网络策略
+#    ✅ 基于最小权限的 RBAC
+#    ✅ Pod 安全标准：restricted
+#    ✅ 容器中使用非 root 用户
+#    ✅ 只读根文件系统
+#    ✅ 无特权容器
+#    ✅ 从外部密钥管理器获取密钥
+#    ✅ 镜像扫描和签名
+#    ✅ API 身份验证和授权
+#    ✅ 限流和 DDoS 防护
+#
+# 3. 性能：
+#    ✅ 资源请求 = 限制（保证 QoS）
+#    ✅ CPU：1000m 请求，2000m 限制
+#    ✅ 内存：2Gi 请求，4Gi 限制
+#    ✅ GPU 分配（如需要）
+#    ✅ 用于模型缓存的本地 SSD
+#    ✅ 优化的容器镜像（多阶段构建）
+#    ✅ 模型量化和优化
+#
+# 4. 监控与可观测性：
+#    ✅ 完整的 Prometheus/Grafana 栈
+#    ✅ 带有 PagerDuty 集成的 Alertmanager
+#    ✅ ELK 或 Loki 用于集中日志
+#    ✅ 分布式追踪（Jaeger/Zipkin）
+#    ✅ ServiceMonitor 自动抓取
+#    ✅ SLO/SLI 追踪（99.9% 运行时间）
+#    ✅ 错误预算监控
+#    ✅ 性能仪表板
+#
+# 5. 可靠性：
+#    ✅ 自动备份（每日）
+#    ✅ 灾难恢复计划已测试
+#    ✅ 回滚程序已文档化并测试
+#    ✅ 外部依赖的熔断器
+#    ✅ 指数退避的重试逻辑
+#    ✅ 优雅降级（回退响应）
+#    ✅ 连接池
+#    ✅ 配置请求超时
+#
+# 6. 数据管理：
+#    ✅ 有状态数据的持久卷
+#    ✅ 启用卷快照
+#    ✅ 备份保留：30 天
+#    ✅ 跨区域备份复制
+#    ✅ 静态数据加密
+#    ✅ 传输中数据加密
+#
+# 7. 合规与治理：
+#    ✅ 启用审计日志
+#    ✅ 强制执行合规策略（PCI、HIPAA、GDPR）
+#    ✅ 数据保留策略
+#    ✅ 隐私控制
+#    ✅ 定期安全审计
+#    ✅ 漏洞扫描
+#    ✅ 渗透测试
+#
+# ==============================================================================
+# 学生实施
+# ==============================================================================
+
+# TODO: 创建生产环境补丁文件：
+#
+# 1. replica-count-patch.yaml:
+#    apiVersion: apps/v1
+#    kind: Deployment
+#    metadata:
+#      name: ml-api-deployment
+#    spec:
+#      replicas: 5
+#
+# 2. resource-limits-patch.yaml:
+#    apiVersion: apps/v1
+#    kind: Deployment
+#    metadata:
+#      name: ml-api-deployment
+#    spec:
+#      template:
+#        spec:
+#          containers:
+#            - name: ml-api
+#              resources:
+#                requests:
+#                  cpu: 1000m
+#                  memory: 2Gi
+#                limits:
+#                  cpu: 2000m
+#                  memory: 4Gi
+#
+# 3. ingress-patch.yaml:
+#    apiVersion: networking.k8s.io/v1
+#    kind: Ingress
+#    metadata:
+#      name: ml-api-ingress
+#      annotations:
+#        cert-manager.io/cluster-issuer: letsencrypt-prod
+#        nginx.ingress.kubernetes.io/rate-limit: "100"
+#        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+#    spec:
+#      ingressClassName: nginx
+#      rules:
+#        - host: api.example.com
+#          http:
+#            paths:
+#              - path: /
+#                pathType: Prefix
+#                backend:
+#                  service:
+#                    name: ml-api
+#                    port:
+#                      number: 80
+#      tls:
+#        - hosts:
+#            - api.example.com
+#          secretName: production-tls
+#
+# 4. security-patch.yaml:
+#    添加 Pod 安全上下文、网络策略等。
+#
+# 5. monitoring-patch.yaml:
+#    为 Prometheus 添加 ServiceMonitor、PodMonitor
+#
+# TODO: 创建额外的生产环境资源：
+#
+# 1. pod-disruption-budget.yaml:
+#    apiVersion: policy/v1
+#    kind: PodDisruptionBudget
+#    metadata:
+#      name: ml-api-pdb
+#    spec:
+#      minAvailable: 3
+#      selector:
+#        matchLabels:
+#          app: ml-api
+#
+# 2. certificate.yaml:
+#    apiVersion: cert-manager.io/v1
+#    kind: Certificate
+#    metadata:
+#      name: production-tls
+#    spec:
+#      secretName: production-tls
+#      issuerRef:
+#        name: letsencrypt-prod
+#        kind: ClusterIssuer
+#      dnsNames:
+#        - api.example.com
+#
+# 3. service-monitor.yaml:
+#    apiVersion: monitoring.coreos.com/v1
+#    kind: ServiceMonitor
+#    metadata:
+#      name: ml-api-monitor
+#    spec:
+#      selector:
+#        matchLabels:
+#          app: ml-api
+#      endpoints:
+#        - port: http
+#          path: /metrics
+#          interval: 30s
+#
+# TODO: 部署前检查清单：
+#
+# 部署到生产环境之前：
+#
+# [ ] 所有测试在 staging 环境下通过
+# [ ] 安全扫描通过（无严重/高危漏洞）
+# [ ] 负载测试成功完成
+# [ ] 灾难恢复计划已测试
+# [ ] 回滚程序已测试
+# [ ] 监控和告警已配置
+# [ ] 值班轮次已安排
+# [ ] Runbooks 已更新
+# [ ] 变更请求已批准（如需要）
+# [ ] 备份已验证
+# [ ] 团队已通知部署时间窗口
+# [ ] 冒烟测试已准备
+#
+# TODO: 部署程序：
+#
+# 1. 预览更改：
+#    kubectl kustomize kubernetes/overlays/production/ | less
+#
+# 2. 备份当前生产环境：
+#    kubectl get all -n ml-system-production -o yaml > backup-$(date +%Y%m%d-%H%M%S).yaml
+#
+# 3. 应用金丝雀部署（10% 流量）：
+#    # 使用 CD 流水线（需要手动批准）
+#
+# 4. 监控金丝雀 10-15 分钟：
+#    # 观察错误率、延迟、日志
+#    # 如果发现问题，立即回滚
+#
+# 5. 升级到完全部署：
+#    # 渐进式推出：10% → 25% → 50% → 100%
+#    # 每一步都要监控
+#
+# 6. 验证部署：
+#    kubectl get pods -n ml-system-production
+#    kubectl rollout status deployment/ml-api -n ml-system-production
+#
+# 7. 运行冒烟测试：
+#    curl https://api.example.com/health
+#    # 运行完整测试套件
+#
+# 8. 监控 1 小时：
+#    # 观察 Grafana 仪表板
+#    # 检查错误率、延迟
+#    # 审查日志中的错误
+#
+# 9. 宣布成功或回滚：
+#    # 如果所有指标健康，部署成功
+#    # 如果有问题，回滚并调查
+#
+# TODO: 回滚程序：
+#
+# 如果部署失败：
+#
+# 1. 立即回滚：
+#    helm rollback ml-system -n ml-system-production
+#    # 或：kubectl rollout undo deployment/ml-api -n ml-system-production
+#
+# 2. 验证回滚：
+#    kubectl rollout status deployment/ml-api -n ml-system-production
+#
+# 3. 运行冒烟测试：
+#    curl https://api.example.com/health
+#
+# 4. 告警团队：
+#    # 通过 Slack/PagerDuty 通知
+#    # 创建事件报告
+#
+# 5. 调查根本原因：
+#    # 审查日志、指标
+#    # 确定问题所在
+#    # 规划下一次部署的修复
+#
+# TODO: 部署后：
+#
+# [ ] 监控指标 24 小时
+# [ ] 检查是否有任何退化
+# [ ] 更新文档
+# [ ] 标记 Git 提交（例如：prod-v1.2.3）
+# [ ] 更新 MLflow 模型注册表
+# [ ] 编写部署总结
+# [ ] 如有问题，安排事后分析
+#
+# ==============================================================================
+# 生产环境最佳实践
+# ==============================================================================
+
+# 1. 绝不在周五部署（或长假前）
+# 2. 生产部署总是需要两人参与
+# 3. 在低流量时段部署
+# 4. 在部署之前准备好回滚计划
+# 5. 在部署期间和之后持续监控
+# 6. 保持 staging 环境与生产环境一致
+# 7. 定期测试灾难恢复（每季度）
+# 8. 记录一切
+# 9. 对风险更改使用功能开关
+# 10. 绝不要跳过 staging - 即使是"小更改"
